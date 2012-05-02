@@ -43,8 +43,6 @@ function handler (req, res) {
 }
 
 
-
-
 // database of all players
 playerDB = [];
 passwordDB = [];
@@ -55,14 +53,7 @@ idCount = 1;
 
 stateUpdate = [];
 
-usernames = ['james', 'jocelyn', 'dickbutt'];
-usercount = 0;
-
 io.sockets.on('connection', function (socket) {
-
-  // for testing purposes, give the connection a username from a list for auto-login
-  socket.emit('autologin', { name: usernames[usercount++], pass:'asdf' });
-
 
   socket.on('login', function(username, password)
   {
@@ -75,7 +66,7 @@ io.sockets.on('connection', function (socket) {
 	// if user is not in the database, create a new account
 	else if (username != "" && password != "" && !playerDB[username])
 	{
-		var c = 'rgba(' + Math.floor(Math.random() * 190 + 25) + ',' + Math.floor(Math.random() * 190 + 25) + ',' + Math.floor(Math.random() * 190 + 25) + ', 1)'
+		var c = 'rgba(' + Math.floor(Math.random() * 60 + 190) + ',' + Math.floor(Math.random() * 60 + 190) + ',' + Math.floor(Math.random() * 60 + 190) + ', 1)'
 
 		var p = new S_Player(username, username, c);
 		playerDB[username] = p;
@@ -139,7 +130,15 @@ io.sockets.on('connection', function (socket) {
 
 		// d - turn right
 		else if (key == 68)
-			objects[socket.username].turningRight = true;	
+			objects[socket.username].turningRight = true;
+
+		// q - strafe left
+		if (key == 81)
+			objects[socket.username].strafeLeft = true;
+
+		// e - strafe right
+		else if (key == 69)
+			objects[socket.username].strafeRight = true;	
 
 		// space - shoot fireball
 		else if (key == 32)
@@ -168,6 +167,14 @@ io.sockets.on('connection', function (socket) {
 		// d - turn right
 		else if (key == 68)
 			objects[socket.username].turningRight = false;
+
+		// q - strafe left
+		if (key == 81)
+			objects[socket.username].strafeLeft = false;
+
+		// e - strafe right
+		else if (key == 69)
+			objects[socket.username].strafeRight = false;
 	}
   });
 
@@ -229,28 +236,54 @@ function S_Player(id, name, color)
 
 S_Player.prototype.update = function()
 {
-	direc = 0;
+	// calculate the direction of movement
+	direc = [0, 0];
 	if (this.movingForward)
-		direc += 1;
+		direc[0] += 1;
 	if (this.movingBack)
-		direc -= 1;
+		direc[0] -= 1;
+	if (this.strafeLeft)
+		direc[1] -= 1;
+	if (this.strafeRight)
+		direc[1] += 1;
 	if (this.turningLeft)
 		this.heading -= .03;
 	if (this.turningRight)
 		this.heading += .03;
 
-	this.x += direc * Math.cos(this.heading) * 3;
-	this.y += direc * Math.sin(this.heading) * 3;
+	// if moving two directions, normalize the movement vector
+	if (Math.abs(direc[0]) + Math.abs(direc[1]) > 1)
+	{
+		direc[0] /= 1.4142;
+		direc[1] /= 1.4142;
+	}
 
-	if (this.cooldown > 0)
-		this.cooldown = Math.max(0, this.cooldown - 1000 / 60);
+	// update position
+	this.x += (direc[0] * Math.cos(this.heading) - direc[1] * Math.sin(this.heading)) * 3;
+	this.y += (direc[0] * Math.sin(this.heading) + direc[1] * Math.cos(this.heading))* 3;
 
-	if (direc != 0 || this.turningLeft || this.turningRight)
+	// crude collision detection with wall, magic numbers for world boundary and player radius
+	if (this.x < -640 + 15)
+		this.x = -640 + 15;
+	if (this.y < -640 + 15)
+		this.y = -640 + 15;
+	if (this.x > 640 - 15)
+		this.x = 640 - 15;
+	if (this.y > 640 - 15)
+		this.y = 640 - 15;
+
+	// if we've moved, add to the state update
+	if (direc[0] != 0 || direc[1] != 0 || (this.turningLeft ^ this.turningRight))
 	{
 		stateUpdates.push({ id: this.id, property: 'x', value: this.x });
 		stateUpdates.push({ id: this.id, property: 'y', value: this.y });
 		stateUpdates.push({ id: this.id, property: 'heading', value: this.heading });
 	}
+
+	// ability cooldown
+	if (this.cooldown > 0)
+		this.cooldown = Math.max(0, this.cooldown - 1000.0 / 60.0);
+
 
 }
 
@@ -290,7 +323,7 @@ S_Projectile.prototype.update = function()
 	this.y += Math.sin(this.heading) * this.speed;
 
 	// if it leaves the dimensions of the current test map, remove it
-	if (this.x < -1300 || this.y < -550 || this.x > 1300 || this.y > 680)
+	if (this.x < -640 || this.y < -640 || this.x > 640 || this.y > 640)
 	{
 		delete objects[this.id];
 		io.sockets.emit('removeObject', this.id);
