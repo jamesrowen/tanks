@@ -42,7 +42,6 @@ function handler (req, res) {
 	}
 }
 
-
 // database of all players
 playerDB = [];
 passwordDB = [];
@@ -50,11 +49,17 @@ passwordDB = [];
 // objects currently in the game world
 objects = [];
 idCount = 1;
-animations = [];
 
 stateUpdate = [];
 
+usernames = ['james', 'jocelyn', 'dickbutt'];
+usercount = 0;
+
 io.sockets.on('connection', function (socket) {
+
+  // for testing purposes, give the connection a username from a list for auto-login
+  socket.emit('autologin', { name: usernames[usercount++], pass:'asdf' });
+
 
   socket.on('login', function(username, password)
   {
@@ -67,7 +72,7 @@ io.sockets.on('connection', function (socket) {
 	// if user is not in the database, create a new account
 	else if (username != "" && password != "" && !playerDB[username])
 	{
-		var c = 'rgba(' + Math.floor(Math.random() * 60 + 190) + ',' + Math.floor(Math.random() * 60 + 190) + ',' + Math.floor(Math.random() * 60 + 190) + ', 1)'
+		var c = 'rgba(' + Math.floor(Math.random() * 190 + 25) + ',' + Math.floor(Math.random() * 190 + 25) + ',' + Math.floor(Math.random() * 190 + 25) + ', 1)'
 
 		var p = new S_Player(username, username, c);
 		playerDB[username] = p;
@@ -76,7 +81,7 @@ io.sockets.on('connection', function (socket) {
 		socket.username = username;
 		socket.join('loggedin');
 
-		socket.emit('myPlayerData', p.id);
+		socket.emit('myPlayerData', p.getData());
 		var objData = [];
 		for (var key in objects)
 			if (objects.hasOwnProperty(key))
@@ -95,7 +100,7 @@ io.sockets.on('connection', function (socket) {
 		socket.username = username;
 		socket.join('loggedin');
 
-		socket.emit('myPlayerData', playerDB[username].id);
+		socket.emit('myPlayerData', playerDB[username].getData());
 		var objData = [];
 		for (var key in objects)
 			if (objects.hasOwnProperty(key))
@@ -131,15 +136,7 @@ io.sockets.on('connection', function (socket) {
 
 		// d - turn right
 		else if (key == 68)
-			objects[socket.username].turningRight = true;
-
-		// q - strafe left
-		if (key == 81)
-			objects[socket.username].strafeLeft = true;
-
-		// e - strafe right
-		else if (key == 69)
-			objects[socket.username].strafeRight = true;	
+			objects[socket.username].turningRight = true;	
 
 		// space - shoot fireball
 		else if (key == 32)
@@ -168,14 +165,6 @@ io.sockets.on('connection', function (socket) {
 		// d - turn right
 		else if (key == 68)
 			objects[socket.username].turningRight = false;
-
-		// q - strafe left
-		if (key == 81)
-			objects[socket.username].strafeLeft = false;
-
-		// e - strafe right
-		else if (key == 69)
-			objects[socket.username].strafeRight = false;
 	}
   });
 
@@ -195,6 +184,7 @@ io.sockets.on('connection', function (socket) {
 		io.sockets.in('loggedin').emit('global_message', {sender:socket.username, text:" has disconnected."});
 		delete objects[socket.username];
 
+		usercount--;
 	}
   });
 
@@ -208,7 +198,7 @@ var createProjectile = function(player)
 	if (player.cooldown == 0)
 	{
 		console.log("creating proj");
-		objects['proj' + idCount] = new S_Projectile('proj' + idCount, player.x + Math.cos(player.heading - Math.PI/2) * 30, player.y + Math.sin(player.heading - Math.PI/2) * 30, player.heading);
+		objects['proj' + idCount] = new S_Projectile('proj' + idCount, player.x + Math.cos(player.heading) * 30, player.y + Math.sin(player.heading) * 30, player.heading);
 		io.sockets.emit('addObject', objects['proj' + idCount].getData());
 		++idCount;
 		player.cooldown == 1000;
@@ -227,69 +217,37 @@ function S_Player(id, name, color)
 	this.name = name;
 	this.color = color;
 
-	this.x = 0;
-	this.y = 0;
+	this.x = 400;
+	this.y = 300;
 	this.hp = 100;
-	this.heading = 0;
+	this.heading = -Math.PI / 2;
 	this.cooldown = 0;
 }
 
 S_Player.prototype.update = function()
 {
-	// calculate the direction of movement
-	direc = [0, 0];
+	direc = 0;
 	if (this.movingForward)
-		direc[0] += 1;
+		direc += 1;
 	if (this.movingBack)
-		direc[0] -= 1;
-	if (this.strafeLeft)
-		direc[1] -= 1;
-	if (this.strafeRight)
-		direc[1] += 1;
+		direc -= 1;
 	if (this.turningLeft)
 		this.heading -= .03;
 	if (this.turningRight)
 		this.heading += .03;
 
-	if (this.heading > Math.PI)
-		this.heading -= Math.PI * 2;
-	if (this.heading < -Math.PI)
-		this.heading += Math.PI * 2;
+	this.x += direc * Math.cos(this.heading) * 3;
+	this.y += direc * Math.sin(this.heading) * 3;
 
-	// if moving two directions, normalize the movement vector
-	if (Math.abs(direc[0]) + Math.abs(direc[1]) > 1)
-	{
-		direc[0] /= 1.4142;
-		direc[1] /= 1.4142;
-	}
+	if (this.cooldown > 0)
+		this.cooldown = Math.max(0, this.cooldown - 1000 / 60);
 
-	var theta = this.heading - Math.PI/2;
-	// update position
-	this.x += (direc[0] * Math.cos(theta) - direc[1] * Math.sin(theta)) * 3;
-	this.y += (direc[0] * Math.sin(theta) + direc[1] * Math.cos(theta)) * 3;
-
-	// crude collision detection with wall, magic numbers for world boundary and player radius
-	if (this.x < -640 + 15)
-		this.x = -640 + 15;
-	if (this.y < -640 + 15)
-		this.y = -640 + 15;
-	if (this.x > 640 - 15)
-		this.x = 640 - 15;
-	if (this.y > 640 - 15)
-		this.y = 640 - 15;
-
-	// if we've moved, add to the state update
-	if (direc[0] != 0 || direc[1] != 0 || (this.turningLeft ^ this.turningRight))
+	if (direc != 0 || this.turningLeft || this.turningRight)
 	{
 		stateUpdates.push({ id: this.id, property: 'x', value: this.x });
 		stateUpdates.push({ id: this.id, property: 'y', value: this.y });
 		stateUpdates.push({ id: this.id, property: 'heading', value: this.heading });
 	}
-
-	// ability cooldown
-	if (this.cooldown > 0)
-		this.cooldown = Math.max(0, this.cooldown - 1000.0 / 60.0);
-
 
 }
 
@@ -320,16 +278,15 @@ function S_Projectile(id, x, y, heading)
 	this.y = y;
 	this.heading = heading;
 	this.damage = 10;
-	this.speed = 5;
+	this.speed = 7;
 }
 
 S_Projectile.prototype.update = function()
 {
-	this.x += Math.cos(this.heading - Math.PI/2) * this.speed;
-	this.y += Math.sin(this.heading - Math.PI/2) * this.speed;
+	this.x += Math.cos(this.heading) * this.speed;
+	this.y += Math.sin(this.heading) * this.speed;
 
-	// if it leaves the dimensions of the current test map, remove it
-	if (this.x < -640 || this.y < -640 || this.x > 640 || this.y > 640)
+	if (this.x < 5 || this.y < 5 || this.x > 795 || this.y > 595)
 	{
 		delete objects[this.id];
 		io.sockets.emit('removeObject', this.id);
