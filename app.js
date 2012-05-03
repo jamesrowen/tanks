@@ -54,6 +54,9 @@ animations = [];
 
 stateUpdate = [];
 
+dt = 0;					// time delta between frames
+lastTimestamp = 0;		// absolute time of last frame
+
 io.sockets.on('connection', function (socket) {
 
   socket.on('login', function(username, password)
@@ -143,7 +146,7 @@ io.sockets.on('connection', function (socket) {
 
 		// space - shoot fireball
 		else if (key == 32)
-			createProjectile(objects[socket.username]);
+			createProjectile(socket.username);
 	}
 	
   });
@@ -202,19 +205,6 @@ io.sockets.on('connection', function (socket) {
 
 
 
-var createProjectile = function(player)
-{
-	console.log("cd: " + player.cooldown);
-	if (player.cooldown == 0)
-	{
-		console.log("creating proj");
-		objects['proj' + idCount] = new S_Projectile('proj' + idCount, player.x + Math.cos(player.heading - Math.PI/2) * 30, player.y + Math.sin(player.heading - Math.PI/2) * 30, player.heading);
-		io.sockets.emit('addObject', objects['proj' + idCount].getData());
-		++idCount;
-		player.cooldown == 1000;
-	}
-}
-
 // -----------------------------------------------------------------------------
 //
 // Player
@@ -231,10 +221,11 @@ function S_Player(id, name, color)
 	this.y = 0;
 	this.hp = 100;
 	this.heading = 0;
+	this.speed = 120;
 	this.cooldown = 0;
 }
 
-S_Player.prototype.update = function()
+S_Player.prototype.update = function(dt)
 {
 	// calculate the direction of movement
 	direc = [0, 0];
@@ -265,8 +256,8 @@ S_Player.prototype.update = function()
 
 	var theta = this.heading - Math.PI/2;
 	// update position
-	this.x += (direc[0] * Math.cos(theta) - direc[1] * Math.sin(theta)) * 3;
-	this.y += (direc[0] * Math.sin(theta) + direc[1] * Math.cos(theta)) * 3;
+	this.x += (direc[0] * Math.cos(theta) - direc[1] * Math.sin(theta)) * this.speed * dt;
+	this.y += (direc[0] * Math.sin(theta) + direc[1] * Math.cos(theta)) * this.speed * dt;
 
 	// crude collision detection with wall, magic numbers for world boundary and player radius
 	if (this.x < -640 + 15)
@@ -288,7 +279,7 @@ S_Player.prototype.update = function()
 
 	// ability cooldown
 	if (this.cooldown > 0)
-		this.cooldown = Math.max(0, this.cooldown - 1000.0 / 60.0);
+		this.cooldown = Math.max(0, this.cooldown - dt);
 
 
 }
@@ -320,13 +311,13 @@ function S_Projectile(id, x, y, heading)
 	this.y = y;
 	this.heading = heading;
 	this.damage = 10;
-	this.speed = 5;
+	this.speed = 600;
 }
 
-S_Projectile.prototype.update = function()
+S_Projectile.prototype.update = function(dt)
 {
-	this.x += Math.cos(this.heading - Math.PI/2) * this.speed;
-	this.y += Math.sin(this.heading - Math.PI/2) * this.speed;
+	this.x += Math.cos(this.heading - Math.PI/2) * this.speed * dt;
+	this.y += Math.sin(this.heading - Math.PI/2) * this.speed * dt;
 
 	// if it leaves the dimensions of the current test map, remove it
 	if (this.x < -640 || this.y < -640 || this.x > 640 || this.y > 640)
@@ -374,10 +365,14 @@ S_Projectile.prototype.getData = function()
 
 var gameLoop = function()
 {
+	// update the time delta for this frame
+	dt = (Date.now() - lastTimestamp) / 1000;
+	lastTimestamp = Date.now();
+	
 	stateUpdates = [];
 
 	for (var key in objects)
-		objects[key].update();
+		objects[key].update(dt);
 
 	if (stateUpdates.length > 0)
 		io.sockets.emit('stateUpdate', stateUpdates);
@@ -385,3 +380,14 @@ var gameLoop = function()
 }
 
 setInterval(gameLoop, 1000 / 60);
+
+var createProjectile = function(pID)
+{
+	if (objects[pID].cooldown == 0)
+	{
+		objects['proj' + idCount] = new S_Projectile('proj' + idCount, objects[pID].x + Math.cos(objects[pID].heading - Math.PI/2) * 30, objects[pID].y + Math.sin(objects[pID].heading - Math.PI/2) * 30, objects[pID].heading);
+		io.sockets.emit('addObject', objects['proj' + idCount].getData());
+		++idCount;
+		objects[pID].cooldown = 0.4;
+	}
+}
