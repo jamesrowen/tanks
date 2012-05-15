@@ -3,14 +3,25 @@ tanks
 
 - todo
 
- - improve ui elements
- - add more abilities
- - move code into separate files
- - player stats and stuff
+ - add healthbars
+ - add stamina
+ - add death/respawn/kdr
+ - improve ui elements - player "unit frame", stats, intro screen
+ 
+ - refine player action system
+   - create a class with a set of functions - action.start(), update(), end()
+   - use start time instead of timer
+   - incorporate walk/idle, animations, etc
  - add jumping
+ - add player.keyDownWithTap() func for sprinting?
+ - streamline strange input handling path: keyDown callbackfrom browser -> player.input.keyDown() -> player.keyDown()
+ 
+ - move code into separate files
+ - add more abilities
+ - add acceleration to all movement
+ - player stats and stuff
+ - improve chat
  - move some stuff (map, animations) to server side
- - double tap movement keys to dodge/sprint
- - get it hosted
  - set up permanent player db (mongodb)
 
 - ideas
@@ -25,6 +36,21 @@ tanks
 
 - changelog
 
+5/14
+ - action system update in progress
+ - added idle animation
+ - double tap back to dodge back
+ - create input class to handle player input
+ - accumulated taps decay after a short time
+ 
+5/12
+ - double tap strafe keys to dodge (alpha)
+ - double tap turn keys to spin 180
+ - changed key input , needs more work
+
+5/11
+ - got it hosted on nodejitsu - tanks.jit.su
+ 
 5/3
  - made bigger and better map
  - fixed cooldown on shoot ability

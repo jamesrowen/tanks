@@ -17,7 +17,8 @@ myPlayer = '';
 images = [];
 animations = [];
 
-animations['walk'] = new Animation('walk', 1.5, [ 
+animations['idle'] = new Animation('idle', 1.0, [[0, 1, 2], [12, 13, 14], [24, 25, 26], [36, 37, 38]]);
+animations['walk'] = new Animation('walk', 1.0, [ 
   [0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59],
   [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 60, 61, 62, 63, 64, 65 ,66, 67, 68, 69, 70, 71],
   [24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83],
@@ -27,7 +28,7 @@ animations['walk'] = new Animation('walk', 1.5, [
 uielements = [];
 focusElementID = '';
 
-dt = 0;				// time delta between frames
+dt = 0;					// time delta between frames
 lastTimestamp = 0;		// absolute time of last frame
 
 worldmap = [
@@ -81,7 +82,12 @@ var movingForward = false, movingBack = false, turningLeft = false, turningRight
 // Netcode
 // --------------------------------------------------------------------------------------------------//
 
-socket = io.connect('http://tanks.jit.su');
+// use this for running locally
+url = 'http://localhost:8080';
+// use this to run on web
+//url = 'http://tanks.jit.su';
+
+socket = io.connect(url);
 
 
 socket.on('newState', function(data) {
@@ -294,7 +300,7 @@ function Player(data)
 	this.heading = data.heading;
 
 	// animation
-	this.currentAnimation = 'walk';
+	this.currentAnimation = 'idle';
 	this.animationProgress = 0.0;
 }
 
@@ -309,21 +315,16 @@ Player.prototype.update = function(dt)
 // draws the player
 Player.prototype.draw = function()
 {
-	
 	// length of image
 	var len = 12; 
-
 	// tile size
 	var tsx = 24;
 	var tsy = 32;
- 
 	// scaling factor
 	var scale = 2;
-
 	// size on screen
 	var ssx = tsx*scale;
 	var ssy = tsy*scale;
-
 	// convert current position in the animation to the frame we want
 	var index = Math.floor(this.animationProgress / animations[this.currentAnimation].duration * animations[this.currentAnimation].frames[0].length);
   
@@ -445,13 +446,6 @@ var onKeyUp = function(e)
 		socket.emit('keyUp', e.keyCode);
 }
 
-// send message
-var onSend = function(e)
-{
-	socket.emit('message', $('#message').val());
-	$('#message').val("");
-}
-
 
 // --------------------------------------------------------------------------------------------------//
 //
@@ -478,7 +472,7 @@ var draw = function()
 		// draw the world
 		// set up the context to draw from the player's perspective
 		ctx.save();
-		ctx.translate(canvas.width / 2, canvas.height / 2);
+		ctx.translate(canvas.width / 2, canvas.height * 4 / 5);
 		ctx.rotate(-objects[myPlayer].heading);
 		ctx.translate(-objects[myPlayer].x, -objects[myPlayer].y);
 		

@@ -3,11 +3,17 @@ var app = require('http').createServer(handler),
     io = require('socket.io').listen(app), 
     fs = require('fs'),
     url = require('url');
+	
+io.set('log level', 1);
 
 app.listen(8080);
 
+var input = require('./input'), action = require('./action');
 
-// serves up files
+// -----------------------------------------------------------------------------
+//
+// http request server
+// -----------------------------------------------------------------------------
 function handler (req, res) { 
 
 	// serve homepage
@@ -43,7 +49,16 @@ function handler (req, res) {
 }
 
 
+
+// -----------------------------------------------------------------------------
+//
+// begin game code
+// -----------------------------------------------------------------------------
+
+// temporary global variables to be moved elsewhere
+
 // database of all players
+// TODO: create a permanent mongoDB
 playerDB = [];
 passwordDB = [];
 
@@ -56,6 +71,12 @@ stateUpdate = [];
 
 dt = 0;					// time delta between frames
 lastTimestamp = 0;		// absolute time of last frame
+
+
+// -----------------------------------------------------------------------------
+//
+// netcode
+// -----------------------------------------------------------------------------
 
 io.sockets.on('connection', function (socket) {
 
@@ -119,35 +140,7 @@ io.sockets.on('connection', function (socket) {
   socket.on('keyDown', function(key) 
   {
 	if (socket.username)
-	{
-		// w - forward
-		if (key == 87)
-			objects[socket.username].movingForward = true;
-
-		// a - turn left
-		else if (key == 65)
-			objects[socket.username].turningLeft = true;
-
-		// s - back
-		else if (key == 83)
-			objects[socket.username].movingBack = true;
-
-		// d - turn right
-		else if (key == 68)
-			objects[socket.username].turningRight = true;
-
-		// q - strafe left
-		if (key == 81)
-			objects[socket.username].strafeLeft = true;
-
-		// e - strafe right
-		else if (key == 69)
-			objects[socket.username].strafeRight = true;	
-
-		// space - shoot fireball
-		else if (key == 32)
-			createProjectile(socket.username);
-	}
+		objects[socket.username].input.keyDown(key);
 	
   });
 
@@ -155,31 +148,7 @@ io.sockets.on('connection', function (socket) {
   socket.on('keyUp', function(key)
   {
 	if (socket.username)
-	{
-		// w - forward
-		if (key == 87)
-			objects[socket.username].movingForward = false;
-
-		// a - turn left
-		else if (key == 65)
-			objects[socket.username].turningLeft = false;
-
-		// s - back
-		else if (key == 83)
-			objects[socket.username].movingBack = false;
-
-		// d - turn right
-		else if (key == 68)
-			objects[socket.username].turningRight = false;
-
-		// q - strafe left
-		if (key == 81)
-			objects[socket.username].strafeLeft = false;
-
-		// e - strafe right
-		else if (key == 69)
-			objects[socket.username].strafeRight = false;
-	}
+		objects[socket.username].input.keyUp(key);
   });
 
 
@@ -204,7 +173,6 @@ io.sockets.on('connection', function (socket) {
 });
 
 
-
 // -----------------------------------------------------------------------------
 //
 // Player
@@ -221,68 +189,215 @@ function S_Player(id, name, color)
 	this.y = 0;
 	this.hp = 100;
 	this.heading = 0;
-	this.speed = 120;
+	this.speed = 220;
+	this.turnSpeed = Math.PI / 2;
 	this.cooldown = 0;
+	
+	this.turnDir = 0;			// direction we are turning, -1 = left, 1 = right
+	this.walkVec = [0, 0];		// direction we are walking, x = forward/back, y = right/left
+	this.action = 'idle';		// current action/animation we are performing
+	this.actiontimer = 0;		// how long the current action has been going
+	
+	this.input = new input.Input(this);
 }
 
 S_Player.prototype.update = function(dt)
 {
-	// calculate the direction of movement
+	//begin movement
 	direc = [0, 0];
-	if (this.movingForward)
-		direc[0] += 1;
-	if (this.movingBack)
-		direc[0] -= 1;
-	if (this.strafeLeft)
-		direc[1] -= 1;
-	if (this.strafeRight)
-		direc[1] += 1;
-	if (this.turningLeft)
-		this.heading -= .03;
-	if (this.turningRight)
-		this.heading += .03;
+	tDirec = 0;
 
-	if (this.heading > Math.PI)
-		this.heading -= Math.PI * 2;
-	if (this.heading < -Math.PI)
-		this.heading += Math.PI * 2;
-
-	// if moving two directions, normalize the movement vector
-	if (Math.abs(direc[0]) + Math.abs(direc[1]) > 1)
+	// if idle or walking, move normally
+	if (this.action == 'idle' || this.action == 'walking')
 	{
-		direc[0] /= 1.4142;
-		direc[1] /= 1.4142;
+		direc[0] = this.walkVec[0];
+		direc[1] = this.walkVec[1];
+		tDirec = this.turnDir;
+	}
+	// execute an action
+	else
+	{
+		this.actiontimer += dt;
+		if (this.action == 'dodgeBack')
+		{
+			this.speed = 660;
+			direc[0] = -1;
+			if (this.actiontimer > .1)
+			{
+				this.action = 'idle';
+				this.speed = 220;
+				this.actiontimer = 0;
+			}
+		}
+		else if (this.action == 'dodgeLeft')
+		{
+			this.speed = 990;
+			direc[1] = -1;
+			if (this.actiontimer > .2)
+			{
+				this.action = 'idle';
+				this.speed = 220;
+				this.actiontimer = 0;
+			}
+		}
+		else if (this.action == 'dodgeRight')
+		{
+			this.speed = 990;
+			direc[1] = 1;
+			if (this.actiontimer > .2)
+			{
+				this.action = 'idle';
+				this.speed = 220;
+				this.actiontimer = 0;
+			}
+		}
+		else if (this.action == 'spinLeft')
+		{
+			this.turnSpeed = Math.PI * 2;
+			tDirec = -1;
+			if (this.actiontimer * this.turnSpeed >= Math.PI)
+			{
+				this.action = 'idle';
+				this.turnSpeed = Math.PI / 2;
+				this.actiontimer = 0;
+			}
+		}
+		else if (this.action == 'spinRight')
+		{
+			this.turnSpeed = Math.PI * 2;
+			tDirec = 1;
+			if (this.actiontimer * this.turnSpeed >= Math.PI)
+			{
+				this.action = 'idle';
+				this.turnSpeed = Math.PI / 2;
+				this.actiontimer = 0;
+			}
+		}
 	}
 
-	var theta = this.heading - Math.PI/2;
-	// update position
-	this.x += (direc[0] * Math.cos(theta) - direc[1] * Math.sin(theta)) * this.speed * dt;
-	this.y += (direc[0] * Math.sin(theta) + direc[1] * Math.cos(theta)) * this.speed * dt;
-
-	// crude collision detection with wall, magic numbers for world boundary and player radius
-	if (this.x < -640 + 15)
-		this.x = -640 + 15;
-	if (this.y < -640 + 15)
-		this.y = -640 + 15;
-	if (this.x > 640 - 15)
-		this.x = 640 - 15;
-	if (this.y > 640 - 15)
-		this.y = 640 - 15;
-
-	// if we've moved, add to the state update
-	if (direc[0] != 0 || direc[1] != 0 || (this.turningLeft ^ this.turningRight))
+	// update heading
+	if (tDirec != 0)
 	{
-		stateUpdates.push({ id: this.id, property: 'x', value: this.x });
-		stateUpdates.push({ id: this.id, property: 'y', value: this.y });
+		this.heading += tDirec * this.turnSpeed * dt;
+		// normalize to (-180, 180]
+		if (this.heading > Math.PI)
+			this.heading -= Math.PI * 2;
+		if (this.heading <= -Math.PI)
+			this.heading += Math.PI * 2;
+			
 		stateUpdates.push({ id: this.id, property: 'heading', value: this.heading });
 	}
 
-	// ability cooldown
+	// update position
+	if (direc[0] != 0 || direc[1] != 0)
+	{
+		// if running and strafing, normalize the movement vector
+		if (Math.abs(direc[0]) + Math.abs(direc[1]) > 1)
+		{
+			direc[0] /= 1.4142;
+			direc[1] /= 1.4142;
+		}
+			
+		var theta = this.heading - Math.PI/2;
+		// update position
+		this.x += (direc[0] * Math.cos(theta) - direc[1] * Math.sin(theta)) * this.speed * dt;
+		this.y += (direc[0] * Math.sin(theta) + direc[1] * Math.cos(theta)) * this.speed * dt;
+
+		// crude collision detection with wall, magic numbers for world boundary and player radius
+		if (this.x < -640 + 15)
+			this.x = -640 + 15;
+		if (this.y < -640 + 15)
+			this.y = -640 + 15;
+		if (this.x > 640 - 15)
+			this.x = 640 - 15;
+		if (this.y > 640 - 15)
+			this.y = 640 - 15;
+			
+		stateUpdates.push({ id: this.id, property: 'x', value: this.x });
+		stateUpdates.push({ id: this.id, property: 'y', value: this.y });
+		
+		if (this.action == 'idle')
+		{
+			this.action = 'walking';
+			stateUpdates.push({ id: this.id, property: 'currentAnimation', value: 'walk' });
+			stateUpdates.push({ id: this.id, property: 'animationProgress', value: 0 });
+		}
+	}
+	// if no movement and we were moving, switch to idle
+	else if (this.action == 'walking')
+	{
+		this.action = 'idle';
+		stateUpdates.push({ id: this.id, property: 'currentAnimation', value: 'idle' });
+		stateUpdates.push({ id: this.id, property: 'animationProgress', value: 0 });
+	}
+
+	// update cooldown
 	if (this.cooldown > 0)
 		this.cooldown = Math.max(0, this.cooldown - dt);
-
-
+		
+	// update input
+	this.input.update();
 }
+
+S_Player.prototype.keyDoubleTap = function(key)
+{
+	if (key == 's')
+		this.action = 'dodgeBack';
+	if (key == 'q')
+		this.action = 'dodgeLeft';
+	if (key == 'e')
+		this.action = 'dodgeRight';
+	if (key == 'a')
+		this.action = 'spinLeft';
+	if (key == 'd')
+		this.action = 'spinRight';
+}
+
+
+S_Player.prototype.keyDown = function(key)
+{	
+	// run forward/back
+	if (key == 'w')
+		this.walkVec[0] += 1;
+	else if (key == 's')
+		this.walkVec[0] -= 1;
+	// strafe left/right
+	else if (key == 'q')
+		this.walkVec[1] -= 1;
+	else if (key == 'e')
+		this.walkVec[1] += 1;
+	// turn left/right
+	else if (key == 'a')
+		this.turnDir -= 1;
+	else if (key == 'd')
+		this.turnDir += 1;
+	// fire projectile
+	else if (key == 'space')
+	{
+		if (this.cooldown == 0)
+			createProjectile(this.id);
+	}
+}
+
+S_Player.prototype.keyUp = function(key)
+{
+	// run forward/back
+	if (key == 'w')
+		this.walkVec[0] -= 1;
+	else if (key == 's')
+		this.walkVec[0] += 1;
+	// strafe left/right
+	else if (key == 'q')
+		this.walkVec[1] += 1;
+	else if (key == 'e')
+		this.walkVec[1] -= 1;
+	// turn left/right
+	else if (key == 'a')
+		this.turnDir += 1;
+	else if (key == 'd')
+		this.turnDir -= 1;
+}
+
 
 S_Player.prototype.getData = function()
 {  
@@ -311,7 +426,7 @@ function S_Projectile(id, x, y, heading)
 	this.y = y;
 	this.heading = heading;
 	this.damage = 10;
-	this.speed = 600;
+	this.speed = 900;
 }
 
 S_Projectile.prototype.update = function(dt)
@@ -359,7 +474,7 @@ S_Projectile.prototype.getData = function()
 
 // -----------------------------------------------------------------------------
 //
-// Game Loop
+// game loop
 // -----------------------------------------------------------------------------
 
 
@@ -383,11 +498,8 @@ setInterval(gameLoop, 1000 / 60);
 
 var createProjectile = function(pID)
 {
-	if (objects[pID].cooldown == 0)
-	{
-		objects['proj' + idCount] = new S_Projectile('proj' + idCount, objects[pID].x + Math.cos(objects[pID].heading - Math.PI/2) * 30, objects[pID].y + Math.sin(objects[pID].heading - Math.PI/2) * 30, objects[pID].heading);
-		io.sockets.emit('addObject', objects['proj' + idCount].getData());
-		++idCount;
-		objects[pID].cooldown = 0.4;
-	}
+	objects['proj' + idCount] = new S_Projectile('proj' + idCount, objects[pID].x + Math.cos(objects[pID].heading - Math.PI/2) * 30, objects[pID].y + Math.sin(objects[pID].heading - Math.PI/2) * 30, objects[pID].heading);
+	io.sockets.emit('addObject', objects['proj' + idCount].getData());
+	++idCount;
+	objects[pID].cooldown = 0.4;
 }
