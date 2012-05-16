@@ -184,17 +184,20 @@ function S_Player(id, name, color)
 	this.id = id;
 	this.name = name;
 	this.color = color;
-
-	this.x = 0;
-	this.y = 0;
-	this.hp = 100;
-	this.heading = 0;
 	this.speed = 220;
 	this.turnSpeed = Math.PI / 2;
-	this.cooldown = 0;
-	
+	this.hpMax = 100;
+	this.staminaMax = 100;
+	this.x = 0;
+	this.y = 0;
+	this.heading = 0;
 	this.turnDir = 0;			// direction we are turning, -1 = left, 1 = right
 	this.walkVec = [0, 0];		// direction we are walking, x = forward/back, y = right/left
+	
+	this.hp = this.hpMax;
+	this.stamina = this.staminaMax;
+	
+	this.cooldown = 0;
 	this.action = 'idle';		// current action/animation we are performing
 	this.actiontimer = 0;		// how long the current action has been going
 	
@@ -220,9 +223,9 @@ S_Player.prototype.update = function(dt)
 		this.actiontimer += dt;
 		if (this.action == 'dodgeBack')
 		{
-			this.speed = 660;
+			this.speed = 900;
 			direc[0] = -1;
-			if (this.actiontimer > .1)
+			if (this.actiontimer > .12)
 			{
 				this.action = 'idle';
 				this.speed = 220;
@@ -334,6 +337,13 @@ S_Player.prototype.update = function(dt)
 	// update cooldown
 	if (this.cooldown > 0)
 		this.cooldown = Math.max(0, this.cooldown - dt);
+
+	// stamina regen
+	if (this.stamina < this.staminaMax)
+	{
+		this.stamina = Math.min(this.staminaMax, this.stamina + 2 * dt);
+		stateUpdates.push({ id: this.id, property: 'stamina', value: this.stamina });
+	}
 		
 	// update input
 	this.input.update();
@@ -342,15 +352,45 @@ S_Player.prototype.update = function(dt)
 S_Player.prototype.keyDoubleTap = function(key)
 {
 	if (key == 's')
-		this.action = 'dodgeBack';
+	{
+		if (this.stamina >= 10)
+		{
+			this.action = 'dodgeBack';
+			this.stamina -= 10;
+		}
+	}
 	if (key == 'q')
-		this.action = 'dodgeLeft';
+	{
+		if (this.stamina >= 20)
+		{
+			this.action = 'dodgeLeft';
+			this.stamina -= 20;
+		}
+	}
 	if (key == 'e')
-		this.action = 'dodgeRight';
+	{
+		if (this.stamina >= 20)
+		{
+			this.action = 'dodgeRight';
+			this.stamina -= 20;
+		}
+	}
 	if (key == 'a')
-		this.action = 'spinLeft';
+	{
+		if (this.stamina >= 5)
+		{
+			this.action = 'spinLeft';
+			this.stamina -= 5;
+		}
+	}
 	if (key == 'd')
-		this.action = 'spinRight';
+	{
+		if (this.stamina >= 5)
+		{
+			this.action = 'spinRight';
+			this.stamina -= 5;
+		}
+	}
 }
 
 
@@ -408,7 +448,10 @@ S_Player.prototype.getData = function()
 		color: this.color,
 		x: this.x,
 		y: this.y,
+		hpMax: this.hpMax,
 		hp: this.hp,
+		stamina: this.stamina,
+		staminaMax: this.staminaMax,
 		heading: this.heading
 	};
 }
@@ -447,7 +490,7 @@ S_Projectile.prototype.update = function(dt)
 		if (objects.hasOwnProperty(key) && objects[key] instanceof S_Player &&
 			(this.x - objects[key].x) * (this.x - objects[key].x) + (this.y - objects[key].y) * (this.y - objects[key].y) < (12 + 15) * (12 + 15))
 		{
-			objects[key].hp -= this.damage;
+			objects[key].hp = Math.max(objects[key].hp - this.damage, 0);
 			stateUpdates.push({ id: objects[key].id, property: 'hp', value: objects[key].hp });
 			delete objects[this.id];
 			io.sockets.emit('removeObject', this.id);

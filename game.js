@@ -105,8 +105,8 @@ socket.on('addObject', function(data) {
 		gameState = 1;
 		uielements = [];
 		focusElementID = '';
-		uielements["chat"] = new UITextbox("chat", "chat", 45, canvas.height - 23);
-		uielements["chat"].w = 400;
+		uielements['chat'] = new UITextbox('chat', 'chat', 45, canvas.height - 23);
+		uielements['chat'].w = 400;
 	}
 	
 });
@@ -161,12 +161,13 @@ var addObject = function(obj)
 $(document).ready(function()
 {
 	// TODO: load images from file
-	loadImage("welcome", "img/welcome.png");
-	loadImage("projectile", "img/fireball.png");
-	loadImage("tileset", "img/tileset.png");
-	loadImage("login", "img/login.png");
-	loadImage("register", "img/register.png");
-  	loadImage("sprite", "img/sprite.png");		
+	loadImage('welcome', 'img/welcome.png');
+	loadImage('projectile', 'img/fireball.png');
+	loadImage('tileset', 'img/tileset.png');
+	loadImage('login', 'img/login.png');
+	loadImage('register', 'img/register.png');
+  	loadImage('sprite', 'img/sprite.png');		
+  	loadImage('unitframe', 'img/unitframe.png');		
 
 	canvas = document.getElementById('c');
 	ctx = canvas.getContext('2d');
@@ -177,14 +178,14 @@ $(document).ready(function()
 	$(document).keyup(onKeyUp);
 
 	// load login UI
-	uielements["user"] = new UITextbox("user", "user", Math.floor((canvas.width - 75) / 2), Math.floor(canvas.height / 2) + 13);
-	uielements["pass"] = new UITextbox("pass", "pass", Math.floor((canvas.width - 75) / 2), Math.floor(canvas.height / 2) + 48);
-	uielements["login"] = new UIButton("login", "login", Math.floor(canvas.width / 2) - 85, Math.floor(canvas.height / 2) + 100, function() {
-		socket.emit('login', uielements["user"].text, uielements["pass"].text);
+	uielements['user'] = new UITextbox('user', 'user', Math.floor((canvas.width - 75) / 2), Math.floor(canvas.height / 2) + 13);
+	uielements['pass'] = new UITextbox('pass', 'pass', Math.floor((canvas.width - 75) / 2), Math.floor(canvas.height / 2) + 48);
+	uielements['login'] = new UIButton('login', 'login', Math.floor(canvas.width / 2) - 85, Math.floor(canvas.height / 2) + 100, function() {
+		socket.emit('login', uielements['user'].text, uielements['pass'].text);
 	});
 	// TODO: separate login and register functionality
-	uielements["register"] = new UIButton("register", "register", Math.floor(canvas.width / 2) + 5, Math.floor(canvas.height / 2) + 100, function() {
-		socket.emit('login', uielements["user"].text, uielements["pass"].text);
+	uielements['register'] = new UIButton('register', 'register', Math.floor(canvas.width / 2) + 5, Math.floor(canvas.height / 2) + 100, function() {
+		socket.emit('login', uielements['user'].text, uielements['pass'].text);
 	});
 
 	lastTimestamp = Date.now();
@@ -245,7 +246,10 @@ function UITextbox(id, label, x, y)
 
 UITextbox.prototype.draw = function()
 {
-	ctx.font = "12px verdana bold";
+	ctx.fillStyle = 'rgba(255, 255, 255, .7)';
+	ctx.fillRect(this.x + 1, this.y + 1, this.w - 2, this.h - 2);
+	ctx.font = '12px verdana bold';
+	ctx.fillStyle = 'rgba(20, 20, 20, 1)';
 	ctx.fillText(this.label + ':  ' + this.text, this.x - ctx.measureText(this.label + ': ').width, this.y + 13);
 	ctx.strokeRect(this.x, this.y, this.w, this.h);
 }
@@ -296,7 +300,10 @@ function Player(data)
 	this.x = data.x;
 	this.y = data.y;
 	this.color = data.color;
+	this.hpMax = data.hpMax;
 	this.hp = data.hp;
+	this.staminaMax = data.staminaMax;
+	this.stamina = data.stamina;
 	this.heading = data.heading;
 
 	// animation
@@ -333,22 +340,38 @@ Player.prototype.draw = function()
 	var u = (animations[this.currentAnimation].frames[direction][index] % len) * tsx;
 	var v = Math.floor(animations[this.currentAnimation].frames[direction][index] / len) * tsy;
 
-	// mapping
+	// transform context to our position/orientation, draw the sprite, revert the context
 	ctx.save();
 	ctx.translate(this.x, this.y);
 	ctx.rotate(this.heading);
-
-	// print the sprite
-	ctx.drawImage(images["sprite"], u, v, tsx, tsy, -ssx/2 , -ssy/2, ssx, ssy);
+	ctx.drawImage(images['sprite'], u, v, tsx, tsy, -ssx/2 , -ssy/2, ssx, ssy);
 	ctx.restore();
 
 	// draw player name
 	ctx.save();
 	ctx.fillStyle = this.color;
-	ctx.font = "12px verdana bold";
+	ctx.font = '12px verdana bold';
 	ctx.translate(this.x, this.y);
 	ctx.rotate(objects[myPlayer].heading);
-	ctx.fillText(this.name, - ctx.measureText(this.name).width / 2, - 20);
+	ctx.fillText(this.name, - ctx.measureText(this.name).width / 2, -44);
+	
+	// draw HP bar
+	w = 80, h = 6, offset = -36;
+	ctx.fillStyle = 'rgba(63, 63, 63, 1)';
+	ctx.fillRect(-w/2 - 1, offset - 1, w + 2, h + 2);
+	ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+	ctx.fillRect(-w/2, offset, w, h);
+	ctx.fillStyle = 'rgba(255, 0, 0, 1)';
+	ctx.fillRect(-w/2, offset, this.hp / this.hpMax * w, h);
+	
+	// draw stamina bar
+	ctx.fillStyle = 'rgba(63, 63, 63, 1)';
+	ctx.fillRect(-w/2 - 1, offset + h + 1 - 1, w + 2, h - 2 + 2);
+	ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+	ctx.fillRect(-w/2, offset + h + 1, w, h - 2);
+	ctx.fillStyle = 'rgba(218, 165, 32, 1)';
+	ctx.fillRect(-w/2, offset + h + 1, this.stamina / this.staminaMax * w, h - 2);
+	
 	ctx.restore();
 }
 
@@ -368,7 +391,7 @@ Projectile.prototype.draw = function()
 	ctx.save();
 	ctx.translate(this.x, this.y);
 	ctx.rotate(this.heading);
-	ctx.drawImage(images["projectile"], -12, -12);
+	ctx.drawImage(images['projectile'], -12, -12);
 	ctx.restore();
 }
 
@@ -425,7 +448,7 @@ var onKeyDown = function(e)
 		// enter - removes focus from the element
 		else if (e.keyCode == 13)
 		{
-			if (focusElementID == "chat")
+			if (focusElementID == 'chat')
 			{
 				socket.emit('message', uielements[focusElementID].text);
 				uielements[focusElementID].text = '';
@@ -463,7 +486,7 @@ var draw = function()
 	{
 		ctx.save();
 		ctx.translate(canvas.width / 2, canvas.height / 2);
-		ctx.drawImage(images["welcome"], -images["welcome"].width / 2, -images["welcome"].height / 2);
+		ctx.drawImage(images['welcome'], -images['welcome'].width / 2, -images['welcome'].height / 2);
 		ctx.restore();
 	}
 	// logged in
@@ -484,13 +507,17 @@ var draw = function()
 		ctx.restore();
 
 
-		// TODO: add these things as ui elements
-		ctx.fillStyle = 'rgba(10, 10, 53, 1)';
-		// player name, hp, pos
-		ctx.fillText(objects[myPlayer].name, 15, 32);
-		ctx.fillText(objects[myPlayer].hp + "hp", 15, 55);
-		ctx.fillText("(" + Math.floor(objects[myPlayer].x) + ", " + Math.floor(objects[myPlayer].y) + ")", 15, 78);
-		ctx.fillText(objects[myPlayer].heading / Math.PI * 180 + "deg", 15, 101);
+		// draw player's unit frame
+		// TODO: integrate this into ui elements
+		ctx.drawImage(images['unitframe'], 0, 0);
+		ctx.fillStyle = 'rgba(50, 75, 100, 1)';
+		ctx.font = '16px tahoma bold';
+		ctx.fillText(objects[myPlayer].name, (images['unitframe'].width - ctx.measureText(objects[myPlayer].name).width) / 2, 22);
+		ctx.font = '14px tahoma bold';
+		x1 = 15, x2 = 115, yoff = 48, yspace = 20;
+		ctx.fillText(objects[myPlayer].hp + '/' + objects[myPlayer].hpMax + 'hp', x1, yoff);
+		ctx.fillText(objects[myPlayer].stamina + '/' + objects[myPlayer].staminaMax + 'stam', x2, yoff);
+		ctx.fillText('(' + Math.floor(objects[myPlayer].x) + ', ' + Math.floor(objects[myPlayer].y) + ')', x1, yoff + yspace);
 
 		drawPlayerList();
 	}
@@ -499,16 +526,12 @@ var draw = function()
 		uielements[key].draw();
 
 	drawMessages();
-
-	// draw title text
-	ctx.fillStyle = 'rgba(10, 10, 53, 1)';
-	ctx.font = "22px tahoma bold";
 }
 
 var drawMessages = function()
 {
 	var x = 10, y = canvas.height - 32, dy = 15;
-	ctx.font = "12px verdana bold";
+	ctx.font = '12px verdana bold';
 	for (var i = 0; i < Math.min(5, messages.length); ++i)
 	{
 		m = messages[messages.length - 1 - i];
@@ -532,8 +555,8 @@ var drawPlayerList = function()
 {
 	var x = canvas.width - 100, y = canvas.height - 100, dy = 15;
 	ctx.fillStyle = 'rgba(0, 0, 0, 1)';
-	ctx.font = "12px verdana bold";
-	ctx.fillText("players:", x, y - dy - 3);
+	ctx.font = '12px verdana bold';
+	ctx.fillText('players:', x, y - dy - 3);
 	var count = 0;
 	for (var key in objects)
 		if (objects[key] instanceof Player)
@@ -554,7 +577,7 @@ var drawMap = function()
 			var dx = x * ss - worldmap[0].length * ss / 2;
 			var dy = y * ss - worldmap.length * ss / 2;
 
-			ctx.drawImage(images["tileset"], u, v, ts, ts, dx, dy, ss, ss);
+			ctx.drawImage(images['tileset'], u, v, ts, ts, dx, dy, ss, ss);
 		}
 }
 
@@ -566,7 +589,7 @@ var drawMap = function()
 var loadImage = function (name, src)
 {
 	images[name] = new Image();
-	$(images[name]).error(function() { console.log("Error: " + images[name].src + " not loaded."); });
+	$(images[name]).error(function() { console.log('Error: ' + images[name].src + ' not loaded.'); });
 	images[name].src = src;
 }
 

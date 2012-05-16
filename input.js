@@ -10,7 +10,7 @@ var Input = function(player)
 	this.tapTimes = [];		// timers for recent taps
 	
 	this.tapTime = 130;			// max length of a key press to be considered a "tap", in ms
-	this.tapDecayTime = 180;	// the time a tap lasts in the list, in ms
+	this.tapDecayTime = 200;	// the time a tap lasts in the list, in ms
 
 	// maps key codes (received from browser) to the string labels we will use
 	this.keyLabels = {

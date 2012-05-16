@@ -3,11 +3,9 @@ tanks
 
 - todo
 
- - add healthbars
- - add stamina
- - add death/respawn/kdr
- - improve ui elements - player "unit frame", stats, intro screen
- 
+ - improve ui elements - player "unit frame", stats
+
+ - add death/respawn/kdr 
  - refine player action system
    - create a class with a set of functions - action.start(), update(), end()
    - use start time instead of timer
@@ -36,11 +34,21 @@ tanks
 
 - changelog
 
+5/16
+ - improved ui slightly
+   - added player unit frame
+   - text boxes look better
+5/15
+ - added health bars over players
+ - added stamina to players
+   - double-tap moves cost stamina
+   - regens over time
+   - shown under health bar  
 5/14
  - action system update in progress
  - added idle animation
  - double tap back to dodge back
- - create input class to handle player input
+ - created server-side input class to handle input for each player
  - accumulated taps decay after a short time
  
 5/12
