@@ -1,7 +1,11 @@
-tanks
+<a href='http://tanks.jit.su'>tanks</a>
 =====
 
-- todo
+"Tanks" is a game that has nothing to do with tanks. It is the beginning of a top-down, multiplayer, arena-style, ability-based combat game built on Node. After two weeks of development it was shelved as more pressing matters materialized, but I hope to resume work soon.
+<br/><br/>
+Demo: <a href='http://tanks.jit.su'>tanks.jit.su</a>
+
+<b>- todo</b>
 
  - improve ui elements - player "unit frame", stats
 
@@ -22,7 +26,7 @@ tanks
  - move some stuff (map, animations) to server side
  - set up permanent player db (mongodb)
 
-- ideas
+<b>- ideas</b>
 
  - team based game
  - defend your base
@@ -32,7 +36,7 @@ tanks
  - respawning mob camps to farm
  - resources
 
-- changelog
+<b>- changelog</b>
 
 5/16
  - improved ui slightly
